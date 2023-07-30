@@ -1,6 +1,8 @@
 const asyncHandler = require("express-async-handler");
 const User = require ("../models/userModel");
-const tokenCreation = require("../services/authKey");
+const Token = require("../models/refreshToken");
+
+const { tokenCreation, refreshTokenCreation, refreshProvidedToken } = require("../services/authKey");
 const bcrypt = require("bcrypt");
 
 const createUser = asyncHandler( async(req, res) => {
@@ -54,16 +56,24 @@ const login = asyncHandler( async(req, res)=>{
         res.status(400).json({"message":"Incorrect password!"});
     }
 
-    const token = tokenCreation({
-        user:{
+    const tokenUser = {
             userName: foundUser.userName,
             email:foundUser.email,
             name:foundUser.name,
             lastName:foundUser.lastName
-        }
+    }
+
+    const token = tokenCreation({
+        user:tokenUser
     });
 
-    res.status(200).json(token);
+    const refreshToken = refreshTokenCreation({
+        user:tokenUser
+    });
+
+    await Token.create({refreshToken:refreshToken, user:foundUser});
+
+    res.status(200).json({accessToken:token, refreshToken:refreshToken});
 });
 
 const userInfo = asyncHandler (async (req, res) => {
@@ -77,4 +87,19 @@ const userInfo = asyncHandler (async (req, res) => {
     res.status(200).json(currentUser);
 });
 
-module.exports = { createUser, login, userInfo }
+const userTokenRefresh = asyncHandler (async(req, res) => {
+    const { refreshToken } = req.body;
+    if (!refreshToken){
+        res.status(400).json({"message":"Please provide the refresh Token!"});
+    }
+
+    if (Token.exists({refreshToken:refreshToken})){
+        const newtoken = refreshProvidedToken(refreshToken);
+        res.status(200).json({accessToken:newtoken})
+    }
+    else{
+        res.status(400).json({"message":"Invalid refresh token!"});
+    }
+});
+
+module.exports = { createUser, login, userInfo, userTokenRefresh }
