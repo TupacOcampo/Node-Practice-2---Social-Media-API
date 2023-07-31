@@ -93,7 +93,8 @@ const userTokenRefresh = asyncHandler (async(req, res) => {
         res.status(400).json({"message":"Please provide the refresh Token!"});
     }
 
-    if (Token.exists({refreshToken:refreshToken})){
+    foundToken = await Token.findOne({refreshToken:refreshToken});
+    if (foundToken){
         const newtoken = refreshProvidedToken(refreshToken);
         res.status(200).json({accessToken:newtoken})
     }
@@ -102,4 +103,16 @@ const userTokenRefresh = asyncHandler (async(req, res) => {
     }
 });
 
-module.exports = { createUser, login, userInfo, userTokenRefresh }
+const logout = asyncHandler(async (req, res) => {
+    const { refreshToken }= req.body;
+    if (!refreshToken){
+        res.status(404).json({"message":"Please provide a refresh token"});
+        throw new Error("Please provide a refresh token");
+    }
+
+    await Token.deleteOne({refreshToken:refreshToken}); 
+
+    res.status(200).json({"message":"User logged out. Refresh token deleted"});
+});
+
+module.exports = { createUser, login, userInfo, userTokenRefresh, logout }
